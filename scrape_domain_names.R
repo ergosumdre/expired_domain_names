@@ -70,6 +70,8 @@ get_expired_domains <- function(email, password, keyword){
     }
   html_pages <- list()
   domains <- list()
+  
+  ## Currently breaks if total pages is 1. 
   if(total_pages > 1){
     for (i in 1:total_pages) {
       print(paste0("Page: ", i, " of ", total_pages))
@@ -94,9 +96,6 @@ get_expired_domains <- function(email, password, keyword){
   
   domains <- unlist(domains)
   domains <- data.frame(domain_names = domains)
-  #domains <- domains[-which(str_detect(domains$domain_names, "@") == TRUE)] # bug. removing email addresses.
-  #domains <- unique(domains)
-  #domains <- data.frame(domain_names = domains)
   domains <- domains[-which(str_detect(domains$domain_names, "@") == TRUE),]
   domains <- data.frame(domain_names = domains)
   domains <- unique(domains)
