@@ -107,7 +107,7 @@ get_expired_domains <- function(email, password, keyword){
 }
 
 # use
-coffee <- get_expired_domains(email_address, password, keyword)
+domains_expired_domains <- get_expired_domains(email_address, password, keyword)
 
 
 
