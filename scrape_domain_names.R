@@ -5,13 +5,8 @@ get_expired_domains <- function(email, password, keyword){
   library(rvest)
   library(stringr)
   library(readr)
+  library(parallel)
   
-  
-  
-  ### IF there is an error while bring up rsDriver, delete the file: LICENSE.<something> located here:
-  ### /Users/dre/Library/Application Support/binman_chromedriver/mac64/109.0.5414.25/LICENSE.chromedriver
-  ### 
-  ### 
   login_page <- "https://justdropped.com/next.cgi?file=login.nrml"
   url <- login_page
   rD <- rsDriver(browser="firefox", port=8010L, verbose=F)
@@ -42,9 +37,6 @@ get_expired_domains <- function(email, password, keyword){
   
   Sys.sleep(15)
   
-  
-  
-  
   # get domain names
   page_list <- remDr$getPageSource()[[1]]
   parse_domains <- function(x){
@@ -56,12 +48,11 @@ get_expired_domains <- function(email, password, keyword){
   }
   
   
-  
-  
   ### total_page logic. Gets total number of domains, then divide by num displayed (50)
   num_of_results <- str_locate(page_list, "Total Domains in List: ") 
   num_of_results <- stringr::str_sub(page_list, start = num_of_results[1], end = num_of_results[2] + 20) %>% parse_number()
-  
+  print(num_of_results)
+  i <- 1
   
   if(num_of_results < 50){
     total_pages <- 1
@@ -70,8 +61,6 @@ get_expired_domains <- function(email, password, keyword){
     }
   html_pages <- list()
   domains <- list()
-  
-  ## Currently breaks if total pages is 1. 
   if(total_pages > 1){
     for (i in 1:total_pages) {
       print(paste0("Page: ", i, " of ", total_pages))
@@ -92,21 +81,42 @@ get_expired_domains <- function(email, password, keyword){
     html_pages[[i]] <- remDr$getPageSource()[[1]]
     domains[[i]] <- parse_domains(html_pages[[i]])
   }
-  
-  
   domains <- unlist(domains)
   domains <- data.frame(domain_names = domains)
-  domains <- domains[-which(str_detect(domains$domain_names, "@") == TRUE),]
+  domains <- domains[-which(str_detect(domains$domain_names, "@") == TRUE),] # bug. removing email addresses.
   domains <- data.frame(domain_names = domains)
   domains <- unique(domains)
   return(domains)
-  
-  
-  
 }
 
-# use
-domains_expired_domains <- get_expired_domains(email_address, password, keyword)
+
+expired_domains <- get_expired_domains(email_address, password, keyword)
+
+
+### check domain metrics function
+base_url <- "https://seo-rank.my-addr.com/api2/moz+sr+fb/API_TOKEN/"
+
+getData <- function(x){
+  data <- GET(url = paste0(base_url, x)) %>% content(., type = "application/json") %>% data.frame()
+  data <- data %>% mutate(domain_name = x)
+  col_order <- c("domain_name","da","pa",
+                 "mozrank","links","equity",
+                 "sr_domain","sr_rank","sr_kwords",
+                 "sr_traffic","sr_costs","sr_ulinks",
+                 "sr_hlinks","sr_dlinks","fb_comments",
+                 "fb_shares","fb_reac")
+  data <- data[, col_order]
+  return(data)
+}
+
+
+# apply check domain metrics function
+dat_vec <- expired_domains$domain_names
+raw_data <- parallel::mclapply(dat_vec, getData, mc.cores = 5)
+results <- do.call(rbind.data.frame, raw_data, quote = FALSE)
+
+
+write.csv(results, "expired_domain_stats.csv")
 
 
 
